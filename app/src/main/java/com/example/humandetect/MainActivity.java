@@ -33,6 +33,7 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class MainActivity extends AppCompatActivity {
@@ -41,6 +42,8 @@ public class MainActivity extends AppCompatActivity {
     private SurfaceView boundingBoxView;
     private Paint paint;
     private ProcessCameraProvider cameraProvider;
+    private ExecutorService executorService;
+    private PreviewView previewView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,8 +51,10 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         yoloV5Model = new YoloV5Model(this);
+        executorService = Executors.newSingleThreadExecutor();
 
         boundingBoxView = findViewById(R.id.bounding_box_view);
+        previewView = findViewById(R.id.view_finder);
         paint = new Paint();
         paint.setColor(Color.GREEN);
         paint.setStyle(Paint.Style.STROKE);
@@ -68,57 +73,47 @@ public class MainActivity extends AppCompatActivity {
         final ListenableFuture<ProcessCameraProvider> cameraProviderFuture = ProcessCameraProvider.getInstance(this);
         cameraProviderFuture.addListener(() -> {
             try {
-                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
-                Preview preview = new Preview.Builder().build();
-                PreviewView previewView = findViewById(R.id.view_finder);
-                preview.setSurfaceProvider(previewView.getSurfaceProvider());
-
-                ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .build();
-                imageAnalysis.setAnalyzer(Executors.newSingleThreadExecutor(), image -> {
-                    Bitmap bitmap = convertImageProxyToBitmap(image);
-                    yoloV5Model.detectObjects(bitmap);
-                    image.close();
-                });
-
-                CameraSelector cameraSelector = new CameraSelector.Builder()
-                        .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
-                        .build();
-
-                cameraProvider.bindToLifecycle((LifecycleOwner) this, cameraSelector, preview, imageAnalysis);
-
+                cameraProvider = cameraProviderFuture.get();
+                bindCameraUseCases();
             } catch (ExecutionException | InterruptedException e) {
-                e.printStackTrace();
+                Log.e("MainActivity", "Error starting camera: ", e);
             }
         }, ContextCompat.getMainExecutor(this));
     }
 
     private void bindCameraUseCases() {
+        if (cameraProvider == null) {
+            return;
+        }
+
         Preview preview = new Preview.Builder().build();
-        PreviewView previewView = findViewById(R.id.view_finder);
         preview.setSurfaceProvider(previewView.getSurfaceProvider());
 
         ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build();
-        imageAnalysis.setAnalyzer(Executors.newSingleThreadExecutor(), image -> {
+        imageAnalysis.setAnalyzer(executorService, image -> {
             Bitmap bitmap = convertImageProxyToBitmap(image);
-            yoloV5Model.detectObjects(bitmap);
+            if (bitmap != null) {
+                List<BoundingBox> detections = yoloV5Model.detectObjects(bitmap);
+                updateBoundingBoxes(detections);
+            }
             image.close();
         });
 
+        // Change to front-facing camera
         CameraSelector cameraSelector = new CameraSelector.Builder()
-                .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+                .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
                 .build();
 
         try {
             cameraProvider.unbindAll();
             cameraProvider.bindToLifecycle((LifecycleOwner) this, cameraSelector, preview, imageAnalysis);
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e("MainActivity", "Use case binding failed", e);
         }
     }
+
 
     private Bitmap convertImageProxyToBitmap(ImageProxy image) {
         ImageProxy.PlaneProxy[] planes = image.getPlanes();
@@ -145,32 +140,27 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void updateBoundingBoxes(List<BoundingBox> boundingBoxes) {
-        Log.d("MainActivity", "Updating bounding boxes: " + boundingBoxes.size());
-        SurfaceHolder holder = boundingBoxView.getHolder();
-        if (holder.getSurface().isValid()) {
-            Canvas canvas = holder.lockCanvas();
-            if (canvas != null) {
-                canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
+        runOnUiThread(() -> {
+            SurfaceHolder holder = boundingBoxView.getHolder();
+            if (holder.getSurface().isValid()) {
+                Canvas canvas = holder.lockCanvas();
+                if (canvas != null) {
+                    canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
 
-                int viewWidth = boundingBoxView.getWidth();
-                int viewHeight = boundingBoxView.getHeight();
+                    for (BoundingBox box : boundingBoxes) {
+                        canvas.drawRect(box.x1, box.y1, box.x2, box.y2, paint);
+                        String label = String.format("Person: %.2f", box.confidence);
+                        canvas.drawText(label, box.x1, box.y1 - 10, paint);
+                    }
 
-                for (BoundingBox box : boundingBoxes) {
-                    float left = box.x1 * viewWidth;
-                    float top = box.y1 * viewHeight;
-                    float right = box.x2 * viewWidth;
-                    float bottom = box.y2 * viewHeight;
+                    holder.unlockCanvasAndPost(canvas);
 
-                    canvas.drawRect(left, top, right, bottom, paint);
-                }
-
-                holder.unlockCanvasAndPost(canvas);
-
-                if (!boundingBoxes.isEmpty()) {
-                    runOnUiThread(() -> Toast.makeText(this, "Human detected!", Toast.LENGTH_SHORT).show());
+                    if (!boundingBoxes.isEmpty()) {
+                        Toast.makeText(this, "Human detected!", Toast.LENGTH_SHORT).show();
+                    }
                 }
             }
-        }
+        });
     }
 
     @Override
@@ -191,8 +181,6 @@ public class MainActivity extends AppCompatActivity {
         if (cameraProvider != null) {
             cameraProvider.unbindAll();
         }
+        executorService.shutdown();
     }
-
-
 }
-
