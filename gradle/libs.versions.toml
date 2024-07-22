@@ -1,0 +1,34 @@
+[versions]
+agp = "8.4.1"
+junit = "4.13.2"
+junitVersion = "1.2.1"
+espressoCore = "3.6.1"
+appcompat = "1.7.0"
+material = "1.12.0"
+objectDetectionCommonVersion = "16.3.0"
+visionCommon = "17.3.0"
+objectDetectionCommon = "18.0.0"
+objectDetection = "17.0.1"
+cameraView = "1.3.4"
+cameraLifecycle = "1.3.4"
+roomCompiler = "2.6.1"
+monitor = "1.7.1"
+
+[libraries]
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+object-detection-common-v1630 = { module = "com.google.mlkit:object-detection-common", version.ref = "objectDetectionCommonVersion" }
+vision-common = { group = "com.google.mlkit", name = "vision-common", version.ref = "visionCommon" }
+object-detection-common = { group = "com.google.mlkit", name = "object-detection-common", version.ref = "objectDetectionCommon" }
+object-detection = { group = "com.google.mlkit", name = "object-detection", version.ref = "objectDetection" }
+camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "cameraView" }
+camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "cameraLifecycle" }
+room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "roomCompiler" }
+monitor = { group = "androidx.test", name = "monitor", version.ref = "monitor" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+
