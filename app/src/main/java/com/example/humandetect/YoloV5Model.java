@@ -70,16 +70,21 @@ public class YoloV5Model {
 
             Log.d("YoloV5Model", "Detection " + i + ": confidence = " + confidence);
 
-            if (confidence > 0.3) {  // Adjusted threshold for better accuracy
+            if (confidence > 0.1) {  // Lowered threshold for debugging
                 float x = detection[0];
                 float y = detection[1];
                 float w = detection[2];
                 float h = detection[3];
 
-                float x1 = (x - w / 2) * originalWidth;
-                float y1 = (y - h / 2) * originalHeight;
-                float x2 = (x + w / 2) * originalWidth;
-                float y2 = (y + h / 2) * originalHeight;
+                float x1 = x - w / 2;
+                float y1 = y - h / 2;
+                float x2 = x + w / 2;
+                float y2 = y + h / 2;
+
+                x1 *= originalWidth;
+                y1 *= originalHeight;
+                x2 *= originalWidth;
+                y2 *= originalHeight;
 
                 float maxClassConfidence = 0;
                 int maxClassIndex = -1;
@@ -92,7 +97,7 @@ public class YoloV5Model {
 
                 Log.d("YoloV5Model", "Max class: " + maxClassIndex + ", confidence: " + maxClassConfidence);
 
-                if (maxClassIndex == 0 && maxClassConfidence > 0.3) {  // Assuming 0 is person class
+                if (maxClassIndex == 0 && maxClassConfidence > 0.1) {  // Assuming 0 is person class
                     boundingBoxes.add(new BoundingBox(x1, y1, x2, y2, confidence));
                     Log.d("YoloV5Model", "Person detected: " + x1 + ", " + y1 + ", " + x2 + ", " + y2);
                 }
